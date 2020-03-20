@@ -2,3 +2,6 @@
 so-*
 *.zip
 so-assignments
+.vs*
+libso_stdio.so
+testing_unit.c
