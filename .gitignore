@@ -5,3 +5,8 @@ so-assignments
 .vs*
 libso_stdio.so
 testing_unit.c
+*.txt
+*.in
+*.out
+*test*
+*ceva*
