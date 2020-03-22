@@ -36,9 +36,36 @@ int compute_open_flags(enum mode mode)
 	return flags;
 }
 
+int can_read(enum mode m)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(read_en); ++i)
+		if (m == read_en[i])
+			return 1;
+
+	return 0;
+}
+
+int can_write(enum mode m)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(write_en); ++i)
+		if (m == write_en[i])
+			return 1;
+
+	return 0;
+}
+
 int is_buffer_consumed(SO_FILE *stream)
 {
 	return (stream->buf_data_offset == stream->buf_available_offset);
+}
+
+int is_buffer_full(SO_FILE *stream)
+{
+	return (stream->buf_available_offset == BUFLEN);
 }
 
 ssize_t write_nbytes(int fd, const void *buf, size_t nbytes)
@@ -48,9 +75,8 @@ ssize_t write_nbytes(int fd, const void *buf, size_t nbytes)
 
 	total_written_bytes = 0;
 
-	while ((written_bytes = write(fd, buf + total_written_bytes, nbytes))) {
-		if (written_bytes == -1)
-			return SO_EOF;
+	while (nbytes) {
+		written_bytes = write(fd, buf + total_written_bytes, nbytes);
 
 		nbytes = MAX(nbytes - written_bytes, 0);
 		total_written_bytes += written_bytes;
@@ -66,9 +92,8 @@ ssize_t read_nbytes(int fd, void *buf, size_t nbytes)
 
 	total_read_bytes = 0;
 
-	while ((read_bytes = read(fd, buf + total_read_bytes, nbytes))) {
-		if (read_bytes == -1)
-			return SO_EOF;
+	while (nbytes) {
+		read_bytes = read(fd, buf + total_read_bytes, nbytes);
 
 		nbytes = MAX(nbytes - read_bytes, 0);
 		total_read_bytes += read_bytes;

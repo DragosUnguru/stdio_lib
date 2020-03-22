@@ -42,6 +42,9 @@ static const struct {
 	{aplus,	"a+"}
 };
 
+static const enum mode read_en[] = { r, rplus, wplus, aplus };
+static const enum mode write_en[] = { rplus, w, wplus, append, aplus };
+
 struct _so_file {
 	int fd;
 	enum mode mode;
@@ -55,9 +58,15 @@ struct _so_file {
 
 enum mode str_to_enum (const char *str);
 
+int can_read(enum mode m);
+
+int can_write(enum mode m);
+
 int compute_open_flags(enum mode mode);
 
 int is_buffer_consumed(SO_FILE *stream);
+
+int is_buffer_full(SO_FILE *stream);
 
 ssize_t write_nbytes(int fd, const void *buf, size_t nbytes);
 
