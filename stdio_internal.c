@@ -8,14 +8,14 @@ enum mode str_to_enum(const char *str)
 		if (!strcmp(str, conversion[i].str))
 			return conversion[i].val;
 
-	DIE(1, i, "Invalid file mode.");
+	return err;
 }
 
 int compute_open_flags(enum mode mode)
 {
 	int flags = 0;
 
-	if (mode == rplus || mode == wplus)
+	if (mode == rplus || mode == wplus || mode == aplus)
 		flags |= O_RDWR;
 
 	if (mode != r && mode != rplus)
@@ -30,7 +30,7 @@ int compute_open_flags(enum mode mode)
 	if (mode == append || mode == aplus)
 		flags |= O_APPEND;
 
-	if (mode == w)
+	if (mode == w || mode == append)
 		flags |= O_WRONLY;
 
 	return flags;
@@ -68,7 +68,15 @@ int is_buffer_full(SO_FILE *stream)
 	return (stream->buf_available_offset == BUFLEN);
 }
 
-ssize_t write_nbytes(int fd, const void *buf, size_t nbytes)
+void invalidate_buffer(SO_FILE *stream)
+{
+	stream->buf_available_offset = 0;
+	stream->buf_data_offset = 0;
+	stream->last_operation = VOID;
+	memset(stream->buffer, 0, BUFLEN);
+}
+
+ssize_t write_nbytes(int fd, char *buf, size_t nbytes)
 {
 	ssize_t written_bytes;
 	ssize_t total_written_bytes;
@@ -109,6 +117,8 @@ size_t buffered_read(SO_FILE *stream)
 	void *buf;
 
 	so_fflush(stream);
+
+	stream->last_operation = READ;
 
 	/* If there isn't any useful data in the buffer, read a whole new buf */
 	if (is_buffer_consumed(stream)) {

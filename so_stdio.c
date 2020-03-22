@@ -10,11 +10,17 @@ SO_FILE *so_fopen(const char *pathname, const char *mode)
 	mode_type = str_to_enum(mode);
 	flags = compute_open_flags(mode_type);
 
+	if (mode_type == err)
+		return NULL;
+
 	stream = malloc(sizeof(*stream));
 
 	/* Build the SO_FILE structure */
-	stream->fd = open(pathname, flags, 0760);
-	DIE(stream->fd < 0, stream->last_operation, "fopen failed.");
+	stream->fd = open(pathname, flags, 0644);
+	if (stream->fd == -1) {
+		free(stream);
+		return NULL;
+	}
 
 	stream->buf_data_offset = 0;
 	stream->buf_available_offset = 0;
@@ -58,9 +64,31 @@ long so_ftell(SO_FILE *stream)
 	return res;
 }
 
+int so_fflush(SO_FILE *stream)
+{
+	ssize_t ret;
+
+	if (stream->last_operation != WRITE || !stream->buf_available_offset)
+		return OK;
+
+	ret = write_nbytes(stream->fd, stream->buffer, (size_t) stream->buf_available_offset);
+	DIE(ret == SO_EOF, stream->last_operation, "fflush failed");
+
+	stream->file_offset = so_ftell(stream);
+	stream->file_size = MAX(stream->file_size, stream->file_offset);
+	invalidate_buffer(stream);
+
+	return OK;
+}
+
 int so_fseek(SO_FILE *stream, long offset, int whence)
 {
 	off_t res;
+
+	if (stream->last_operation == READ)
+		invalidate_buffer(stream);
+	else if (stream->last_operation == WRITE)
+		so_fflush(stream);
 
 	res = lseek(stream->fd, offset, whence);
 	DIE(res == -1, stream->last_operation, "fseek failed");
@@ -70,31 +98,10 @@ int so_fseek(SO_FILE *stream, long offset, int whence)
 	return OK;
 }
 
-int so_fflush(SO_FILE *stream)
-{
-	ssize_t ret;
-
-	if (stream->last_operation != WRITE || stream->buf_available_offset == 0)
-		return OK;
-
-	printf("\t\tPAZEA\n\nstream->buf_available_offset: %d\n\nAvem in buffer:\n\n%s\n\n", stream->buf_available_offset, stream->buffer);
-
-	ret = write_nbytes(stream->fd, stream->buffer, stream->buf_available_offset);
-	DIE(ret == SO_EOF, stream->last_operation, "fflush failed");
-
-	stream->file_offset = so_ftell(stream);
-	stream->file_size = MAX(stream->file_size, stream->file_offset);
-	stream->last_operation = VOID;
-	stream->buf_data_offset = 0;
-	stream->buf_available_offset = 0;
-	memset(stream->buffer, 0, BUFLEN);
-
-	return OK;
-}
-
 int so_fgetc(SO_FILE *stream)
 {
 	char res;
+	off_t check;
 
 	if (so_feof(stream) || !can_read(stream->mode))
 		return SO_EOF;
@@ -105,7 +112,12 @@ int so_fgetc(SO_FILE *stream)
 		buffered_read(stream);
 
 	res = stream->buffer[stream->buf_data_offset++];
-	so_fseek(stream, 1, SEEK_CUR);
+
+	/* Move file pointer 1 position */
+	check = lseek(stream->fd, 1, SEEK_CUR);
+	DIE(check == -1, stream->last_operation, "fseek failed");
+
+	stream->file_offset++;
 
 	return (int) res;
 }
@@ -115,6 +127,7 @@ size_t so_fread(void *ptr, size_t size, size_t nmemb, SO_FILE *stream)
 	long demanded_bytes = size * nmemb;
 	size_t read_bytes = 0;
 	size_t total_read_bytes = 0;
+	off_t res;
 
 	if (!can_read(stream->mode))
 		return 0;
@@ -138,10 +151,12 @@ size_t so_fread(void *ptr, size_t size, size_t nmemb, SO_FILE *stream)
 		demanded_bytes -= read_bytes;
 		total_read_bytes += read_bytes;
 
-		so_fseek(stream, read_bytes, SEEK_CUR);
-	}
+		/* Set file cursor accordingly */
+		res = lseek(stream->fd, read_bytes, SEEK_CUR);
+		DIE(res == -1, stream->last_operation, "lseek failed");
 
-	stream->last_operation = READ;
+		stream->file_offset += read_bytes;
+	}
 
 	return nmemb;
 }
@@ -151,15 +166,16 @@ int so_fputc(int c, SO_FILE *stream)
 	if (!can_write(stream->mode))
 		return 0;
 
+	/*	CAM CIUDAT: TESTUL 13: FPUTC LARGE
+	if (stream->last_operation != WRITE)
+		invalidate_buffer(stream);
+	*/
+	stream->last_operation = WRITE;
+
 	if (is_buffer_full(stream))
 		so_fflush(stream);
 
 	stream->buffer[stream->buf_available_offset++] = (char) c;
-
-	printf("inserted character (%c) at index %d\n", (char) c, stream->buf_available_offset - 1);
-
-	so_fseek(stream, 1, SEEK_CUR);
-	stream->last_operation = WRITE;
 
 	return c;
 }
@@ -173,6 +189,10 @@ size_t so_fwrite(const void *ptr, size_t size, size_t nmemb, SO_FILE *stream)
 	if (!can_write(stream->mode))
 		return 0;
 
+	/* Invalidate buffer if needed */
+	if (stream->last_operation != WRITE)
+		invalidate_buffer(stream);
+
 	while (demanded_bytes) {
 		if (is_buffer_full(stream))
 			so_fflush(stream);
@@ -184,11 +204,11 @@ size_t so_fwrite(const void *ptr, size_t size, size_t nmemb, SO_FILE *stream)
 		ptr + total_read_bytes, read_bytes);
 
 		stream->buf_available_offset += read_bytes;
+		stream->last_operation = WRITE;
+
 		demanded_bytes -= read_bytes;
 		total_read_bytes += read_bytes;
 	}
-
-	stream->last_operation = WRITE;
 
 	return nmemb;
 }

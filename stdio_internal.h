@@ -27,8 +27,8 @@
 #define BUFLEN	4096
 #define OK		0
 
-enum operation {READ, WRITE, VOID, ERR};
-enum mode {r, rplus, w, wplus, append, aplus};
+enum operation { READ, WRITE, VOID, ERR };
+enum mode { r, rplus, w, wplus, append, aplus, err };
 
 static const struct {
     enum mode	val;
@@ -68,7 +68,9 @@ int is_buffer_consumed(SO_FILE *stream);
 
 int is_buffer_full(SO_FILE *stream);
 
-ssize_t write_nbytes(int fd, const void *buf, size_t nbytes);
+void invalidate_buffer(SO_FILE *stream);
+
+ssize_t write_nbytes(int fd, char *buf, size_t nbytes);
 
 ssize_t read_nbytes(int fd, void *buf, size_t nbytes);
 
