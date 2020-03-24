@@ -1,0 +1,39 @@
+                #Unguru Dragos-Gabriel, 336CC
+
+        # STDIO LIBRARY
+
+    This project represents my personal approach at the
+stdio library in a UNIX environment.
+
+    This ideea infers the following implementations
+of basic stdio functions:
+        ->fopen     ->fclose
+        ->fread     ->fwrite
+        ->fgetc     ->fputc
+        ->popen     ->pclose
+        ->feof      ->ferr
+        ->ftell     ->fseek
+        ->fflush
+
+    My approach for this project implied memorizing
+all my offsets needed (file offsets, buffer offsets) as
+actual byte-length offsets, rather than pointers.
+
+    Note that there are somehow 2 file pointers used in this
+implementation:
+        -> The actual cursor of the file (manipulated
+            using ftell)
+        -> A personal "cursor" memorized as an offset
+            for keeping track of the file-crossing progress.
+
+    This was needed mainly because the program implements the
+library using a buffering technique for both reads and writes.
+
+    This supposes some extra care when juggling between different
+operations. The buffer is the middle-man in-between all interactions
+with the library. Everything goes through the buffer first, weather it's
+a read or a write operation.
+
+    The stdio_internal header implemets useful methods for implementing
+the library. For further implementation details, the code is thoroughly
+commented

@@ -85,6 +85,8 @@ ssize_t write_nbytes(int fd, char *buf, size_t nbytes)
 
 	while (nbytes) {
 		written_bytes = write(fd, buf + total_written_bytes, nbytes);
+		if (written_bytes == -1)
+			return SO_EOF;
 
 		nbytes = MAX(nbytes - written_bytes, 0);
 		total_written_bytes += written_bytes;
@@ -100,12 +102,17 @@ ssize_t read_nbytes(int fd, void *buf, size_t nbytes)
 
 	total_read_bytes = 0;
 
-	while (nbytes) {
+	do {
 		read_bytes = read(fd, buf + total_read_bytes, nbytes);
+		if (!read_bytes)
+			return total_read_bytes;
+
+		if (read_bytes == -1)
+			return SO_EOF;
 
 		nbytes = MAX(nbytes - read_bytes, 0);
 		total_read_bytes += read_bytes;
-	}
+	} while (nbytes);
 
 	return total_read_bytes;
 }
@@ -134,7 +141,10 @@ size_t buffered_read(SO_FILE *stream)
 	lseek(stream->fd, stream->buf_data_offset, SEEK_CUR);
 
 	read_bytes = read_nbytes(stream->fd, buf, available_space);
-	DIE(read_bytes == SO_EOF, stream->last_operation, "buf_read failed");
+	if (read_bytes == SO_EOF) {
+		stream->err_encountered = ERR;
+		return SO_EOF;
+	}
 
 	/* Move file pointer to it's original position */
 	lseek(stream->fd, -(read_bytes + stream->buf_data_offset), SEEK_CUR);
