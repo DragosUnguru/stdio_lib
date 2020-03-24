@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h> 
-#include <sys/stat.h> 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -18,15 +18,14 @@
 
 #ifndef DIE
 /* useful macro for handling error codes */
-#define DIE(assertion, indicator, call_description)	\
-	do {											\
-		if (assertion) {							\
-			indicator = SO_EOF;						\
-			fprintf(stderr, "(%s, %d): ",			\
-					__FILE__, __LINE__);			\
-			perror(call_description);				\
-			exit SO_EOF;							\
-		}											\
+#define DIE(assertion, call_description)	\
+	do {									\
+		if (assertion) {					\
+			fprintf(stderr, "(%s, %d): ",	\
+					__FILE__, __LINE__);	\
+			perror(call_description);		\
+			exit SO_EOF;					\
+		}									\
 	} while (0)
 #endif
 
@@ -42,31 +41,32 @@ enum operation { READ, WRITE, VOID };
 enum mode { r, rplus, w, wplus, append, aplus, err };
 
 static const struct {
-    enum mode	val;
-    const char	*str;
-} conversion [] = {
-	{r,		"r"},
-	{rplus, "r+"},
-	{w,		"w"},
-	{wplus,	"w+"},
-	{append,"a"},
-	{aplus,	"a+"}
+	enum mode	val;
+	const char	*str;
+} conversion[] = {
+	{r,			"r"},
+	{rplus, 	"r+"},
+	{w,			"w"},
+	{wplus,		"w+"},
+	{append,	"a"},
+	{aplus,		"a+"}
 };
 
 static const enum mode read_en[] = { r, rplus, wplus, aplus };
 static const enum mode write_en[] = { rplus, w, wplus, append, aplus };
 
+/* File structure */
 struct _so_file {
-	int fd;
-	int pid;
-	char err_encountered;
-	enum mode mode;
-	enum operation last_operation;
-	char buffer[BUFLEN];
-	off_t buf_available_offset;
-	off_t buf_data_offset;
-	off_t file_offset;
-	off_t file_size;
+	int fd;							/* File descriptor */
+	int pid;						/* Process ID if popened */
+	char err_encountered;			/* If any error occured */
+	enum mode mode;					/* Mode of the file opened (r, w, a, etc) */
+	enum operation last_operation;	/* Last operation executed on the buffer */
+	char buffer[BUFLEN];			/* Buffer */
+	off_t buf_available_offset;		/* Next empty buffer position */
+	off_t buf_data_offset;			/* Marks the position in the buffer of in queue data */
+	off_t file_offset;				/* Offset from the beggining of the file. A logic file cursor */
+	off_t file_size;				/* File size in bytes */
 };
 
 /* Converts strings like "r", "r+", "a", etc
@@ -122,4 +122,4 @@ ssize_t read_nbytes(int fd, void *buf, size_t nbytes);
  */
 size_t buffered_read(SO_FILE *stream);
 
-#endif
+#endif	/* STDIO_INTERNAL */

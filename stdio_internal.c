@@ -13,6 +13,10 @@ enum mode str_to_enum(const char *str)
 
 int compute_open_flags(enum mode mode)
 {
+	/* Compute the flag in a cascading manner
+	 * as there are many common flags between
+	 * modes
+	 */
 	int flags = 0;
 
 	if (mode == rplus || mode == wplus || mode == aplus)
@@ -83,8 +87,14 @@ ssize_t write_nbytes(int fd, char *buf, size_t nbytes)
 
 	total_written_bytes = 0;
 
+	/* Syscall might not write the demanded number
+	 * of bytes we've asked for. Write till we reach
+	 * the demanded no. of bytes
+	 */
 	while (nbytes) {
 		written_bytes = write(fd, buf + total_written_bytes, nbytes);
+
+		/* If an error occured */
 		if (written_bytes == -1)
 			return SO_EOF;
 
@@ -102,11 +112,18 @@ ssize_t read_nbytes(int fd, void *buf, size_t nbytes)
 
 	total_read_bytes = 0;
 
+	/* Syscall might not read the demanded number
+	 * of bytes we've asked for. Read till we reach
+	 * the demanded no. of bytes. Also execute a read
+	 * no matter what to check for EOF.
+	 */
 	do {
 		read_bytes = read(fd, buf + total_read_bytes, nbytes);
+		/* If reached the end of the file */
 		if (!read_bytes)
 			return total_read_bytes;
 
+		/* If an error occured */
 		if (read_bytes == -1)
 			return SO_EOF;
 

@@ -30,13 +30,13 @@ SO_FILE *so_fopen(const char *pathname, const char *mode)
 	stream->pid = -1;
 
 	stream->file_offset = lseek(stream->fd, 0, SEEK_CUR);
-	DIE(stream->file_offset == -1, stream->last_operation, "fopen failed");
+	DIE(stream->file_offset == -1, "fopen failed");
 
 	stream->file_size = lseek(stream->fd, 0, SEEK_END);
-	DIE(stream->file_size == -1, stream->last_operation, "fopen failed");
+	DIE(stream->file_size == -1, "fopen failed");
 
 	ret = lseek(stream->fd, stream->file_offset, SEEK_SET);
-	DIE(ret == -1, stream->last_operation, "fopen failed");
+	DIE(ret == -1, "fopen failed");
 
 	return stream;
 }
@@ -99,7 +99,7 @@ int so_fseek(SO_FILE *stream, long offset, int whence)
 	}
 
 	stream->file_offset = lseek(stream->fd, 0, SEEK_CUR);
-	DIE(stream->file_offset == -1, stream->last_operation, "fseek failed");
+	DIE(stream->file_offset == -1, "fseek failed");
 
 	return OK;
 }
@@ -136,10 +136,12 @@ int so_fgetc(SO_FILE *stream)
 	res = stream->buffer[stream->buf_data_offset++];
 
 	/* Move file pointer 1 position */
-	check = lseek(stream->fd, 1, SEEK_CUR);
-	DIE(check == -1, stream->last_operation, "fseek failed");
+	if (stream->pid == -1) {
+		check = lseek(stream->fd, 1, SEEK_CUR);
+		DIE(check == -1, "fseek failed");
 
-	stream->file_offset++;
+		stream->file_offset++;
+	}
 
 	return (int) res;
 }
@@ -186,10 +188,12 @@ size_t so_fread(void *ptr, size_t size, size_t nmemb, SO_FILE *stream)
 		total_read_bytes += read_bytes;
 
 		/* Set file cursor accordingly */
-		res = lseek(stream->fd, read_bytes, SEEK_CUR);
-		DIE(res == -1, stream->last_operation, "lseek failed");
+		if (stream->pid == -1) {
+			res = lseek(stream->fd, read_bytes, SEEK_CUR);
+			DIE(res == -1, "lseek failed");
 
-		stream->file_offset += read_bytes;
+			stream->file_offset += read_bytes;
+		}
 	}
 
 	return nmemb;
@@ -247,7 +251,9 @@ size_t so_fwrite(const void *ptr, size_t size, size_t nmemb, SO_FILE *stream)
 		demanded_bytes -= read_bytes;
 		total_read_bytes += read_bytes;
 	}
-	stream->file_offset += total_read_bytes;
+
+	if (stream->pid == -1)
+		stream->file_offset += total_read_bytes;
 
 	return nmemb;
 }
@@ -308,6 +314,8 @@ SO_FILE *so_popen(const char *command, const char *type)
 		stream->last_operation = VOID;
 		stream->mode = casted_type;
 		stream->err_encountered = OK;
+		stream->file_offset = 0;
+		stream->file_size = BUFLEN;
 
 		if (casted_type == w) {
 			stream->fd = write_fd;
@@ -326,7 +334,7 @@ int so_fclose(SO_FILE *stream)
 	int ret = OK;
 
 	/* Write any pending data */
-	so_fflush(stream);
+	ret = so_fflush(stream);
 
 	if (close(stream->fd) == -1)
 		ret = SO_EOF;
@@ -337,10 +345,13 @@ int so_fclose(SO_FILE *stream)
 
 int so_pclose(SO_FILE *stream)
 {
-	int ret, status;
+	int ret, status, pid;
 
-	ret = waitpid(stream->pid, &status, 0);
+	/* First, we have to close the pipe fds, so retain the pid */
+	pid = stream->pid;
+
 	so_fclose(stream);
+	ret = waitpid(pid, &status, 0);
 
-	return ret;
+	return (ret == -1) ? -1 : 0;
 }
