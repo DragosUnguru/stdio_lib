@@ -18,24 +18,24 @@
 
 #ifndef DIE
 /* useful macro for handling error codes */
-#define DIE(assertion, call_description)	\
-	do {									\
-		if (assertion) {					\
-			fprintf(stderr, "(%s, %d): ",	\
+#define DIE(assertion, call_description)			\
+	do {							\
+		if (assertion) {				\
+			fprintf(stderr, "(%s, %d): ",		\
 					__FILE__, __LINE__);	\
 			perror(call_description);		\
-			exit SO_EOF;					\
-		}									\
+			exit SO_EOF;				\
+		}						\
 	} while (0)
 #endif
 
 #define ARRAY_SIZE(a)	(sizeof(a) / sizeof(*(a)))
-#define MAX(a, b)		((a > b) ? a : b)
-#define MIN(a, b)		((a > b) ? b : a)
+#define MAX(a, b)	((a > b) ? a : b)
+#define MIN(a, b)	((a > b) ? b : a)
 
 #define BUFLEN	4096
-#define OK		0
-#define ERR		7
+#define OK	0
+#define ERR	7
 
 enum operation { READ, WRITE, VOID };
 enum mode { r, rplus, w, wplus, append, aplus, err };
@@ -44,9 +44,9 @@ static const struct {
 	enum mode	val;
 	const char	*str;
 } conversion[] = {
-	{r,			"r"},
+	{r,		"r"},
 	{rplus, 	"r+"},
-	{w,			"w"},
+	{w,		"w"},
 	{wplus,		"w+"},
 	{append,	"a"},
 	{aplus,		"a+"}
@@ -57,16 +57,16 @@ static const enum mode write_en[] = { rplus, w, wplus, append, aplus };
 
 /* File structure */
 struct _so_file {
-	int fd;							/* File descriptor */
-	int pid;						/* Process ID if popened */
-	char err_encountered;			/* If any error occured */
-	enum mode mode;					/* Mode of the file opened (r, w, a, etc) */
+	int fd;				/* File descriptor */
+	int pid;			/* Process ID if popened */
+	char err_encountered;		/* If any error occured */
+	enum mode mode;			/* Mode of the file opened (r, w, a, etc) */
 	enum operation last_operation;	/* Last operation executed on the buffer */
-	char buffer[BUFLEN];			/* Buffer */
-	off_t buf_available_offset;		/* Next empty buffer position */
-	off_t buf_data_offset;			/* Marks the position in the buffer of in queue data */
-	off_t file_offset;				/* Offset from the beggining of the file. A logic file cursor */
-	off_t file_size;				/* File size in bytes */
+	char buffer[BUFLEN];		/* Buffer */
+	off_t buf_available_offset;	/* Next empty buffer position */
+	off_t buf_data_offset;		/* Marks the position in the buffer of in queue data */
+	off_t file_offset;		/* Offset from the beggining of the file. A logic file cursor */
+	off_t file_size;		/* File size in bytes */
 };
 
 /* Converts strings like "r", "r+", "a", etc
